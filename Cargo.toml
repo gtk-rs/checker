@@ -1,0 +1,16 @@
+[package]
+name = "checker"
+version = "0.1.0"
+authors = ["Guillaume Gomez <guillaume1.gomez@gmail.com>"]
+
+description = "Checker used to check gtk-rs repositories"
+repository = "https://github.com/gtk-rs/checker"
+license = "Apache-2.0"
+homepage = "https://github.com/gtk-rs/checker"
+
+[dependencies]
+toml = "0.5"
+
+[[bin]]
+name = "checker"
+path = "src/main.rs"

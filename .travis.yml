@@ -1,0 +1,8 @@
+dist: xenial
+language: rust
+matrix:
+  include:
+    - os: linux
+      rust: stable
+script:
+  - cargo check
