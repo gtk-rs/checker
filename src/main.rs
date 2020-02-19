@@ -50,29 +50,86 @@ impl TomlHelper for toml::Value {
     }
 }
 
+struct Info {
+    correctly_declared_manual_traits: HashSet<String>,
+    listed_crate_objects: HashSet<String>,
+}
+
 // Return a map where the key is the full object name and has the manual associated traits.
-fn get_objects(toml_file: &Path) -> HashSet<String> {
+fn get_objects(toml_file: &Path) -> Info {
     let toml: Value = toml::from_str(&fs::read_to_string(toml_file).expect("failed to read toml"))
         .expect("invalid toml");
-    let mut map: HashSet<String> = HashSet::new();
+    let mut correctly_declared_manual_traits: HashSet<String> = HashSet::new();
+    let mut listed_crate_objects: HashSet<String> = HashSet::new();
 
+    let current_lib = toml
+        .lookup_str("options.library")
+        .expect("failed to get current library");
+    for entry in get_vec!(toml, "options.generate")
+        .iter()
+        .filter_map(|x| x.as_str())
+    {
+        listed_crate_objects.insert(
+            entry
+                .split(".")
+                .skip(1)
+                .next()
+                .expect("couldn't extract name")
+                .to_owned(),
+        );
+    }
+    for entry in get_vec!(toml, "options.builders")
+        .iter()
+        .filter_map(|x| x.as_str())
+    {
+        listed_crate_objects.insert(
+            entry
+                .split(".")
+                .skip(1)
+                .next()
+                .expect("couldn't extract name")
+                .to_owned(),
+        );
+    }
+    for entry in get_vec!(toml, "options.manual")
+        .iter()
+        .filter_map(|x| x.as_str())
+    {
+        let mut parts = entry.split(".");
+        let lib = parts.next().expect("failed to extract lib");
+        if lib != current_lib {
+            continue;
+        }
+        listed_crate_objects.insert(parts.next().expect("couldn't extract name").to_owned());
+    }
     for objs in toml.lookup("object").map(|a| a.as_array().unwrap()) {
         for obj in objs {
-            if let Some(_) = obj.lookup_str("name") {
-                for elem in get_vec!(obj, "manual_traits")
-                    .iter()
-                    .filter_map(|x| x.as_str())
-                    .map(|x| x.to_owned())
-                {
-                    map.insert(elem);
+            if let Some(name) = obj.lookup_str("name") {
+                let mut parts = name.split(".");
+                let lib = parts.next().expect("failed to extract lib");
+                if lib != current_lib {
+                    continue;
+                }
+                if let Some(name) = parts.next() {
+                    for elem in get_vec!(obj, "manual_traits")
+                        .iter()
+                        .filter_map(|x| x.as_str())
+                        .map(|x| x.to_owned())
+                    {
+                        correctly_declared_manual_traits.insert(elem);
+                    }
+                    listed_crate_objects.insert(name.to_owned());
                 }
             }
         }
     }
-    map
+    Info {
+        correctly_declared_manual_traits,
+        listed_crate_objects,
+    }
 }
 
-fn get_manual_traits_from_file(src_file: &Path, objects: &HashSet<String>, ret: &mut Vec<String>) {
+fn get_manual_traits_from_file(src_file: &Path, objects: &Info, ret: &mut Vec<String>) {
     let content = fs::read_to_string(src_file).expect("failed to read source file");
     for line in content.lines() {
         let line = line.trim();
@@ -93,13 +150,16 @@ fn get_manual_traits_from_file(src_file: &Path, objects: &HashSet<String>, ret: 
         if !name.ends_with("ExtManual") {
             continue;
         }
-        if !objects.contains(name) {
+        let obj = &name[..name.len() - 9];
+        if !objects.correctly_declared_manual_traits.contains(name)
+            && objects.listed_crate_objects.contains(obj)
+        {
             ret.push(name.to_owned());
         }
     }
 }
 
-fn get_manual_traits(src_dir: &Path, objects: &HashSet<String>) -> Vec<String> {
+fn get_manual_traits(src_dir: &Path, objects: &Info) -> Vec<String> {
     let mut ret = Vec::new();
 
     for entry in fs::read_dir(src_dir).expect("read_dir failed") {
