@@ -14,7 +14,7 @@ macro_rules! get_vec {
             Some(v) => v.as_slice(),
             None => &[],
         }
-    }}
+    }};
 }
 
 // This trait comes from https://github.com/gtk-rs/gir
@@ -52,13 +52,18 @@ impl TomlHelper for toml::Value {
 
 // Return a map where the key is the full object name and has the manual associated traits.
 fn get_objects(toml_file: &Path) -> HashSet<String> {
-    let toml: Value = toml::from_str(&fs::read_to_string(toml_file).expect("failed to read toml")).expect("invalid toml");
+    let toml: Value = toml::from_str(&fs::read_to_string(toml_file).expect("failed to read toml"))
+        .expect("invalid toml");
     let mut map: HashSet<String> = HashSet::new();
 
     for objs in toml.lookup("object").map(|a| a.as_array().unwrap()) {
         for obj in objs {
             if let Some(_) = obj.lookup_str("name") {
-                for elem in get_vec!(obj, "manual_traits").iter().filter_map(|x| x.as_str()).map(|x| x.to_owned()) {
+                for elem in get_vec!(obj, "manual_traits")
+                    .iter()
+                    .filter_map(|x| x.as_str())
+                    .map(|x| x.to_owned())
+                {
                     map.insert(elem);
                 }
             }
@@ -67,11 +72,7 @@ fn get_objects(toml_file: &Path) -> HashSet<String> {
     map
 }
 
-fn get_manual_traits_from_file(
-    src_file: &Path,
-    objects: &HashSet<String>,
-    ret: &mut Vec<String>,
-) {
+fn get_manual_traits_from_file(src_file: &Path, objects: &HashSet<String>, ret: &mut Vec<String>) {
     let content = fs::read_to_string(src_file).expect("failed to read source file");
     for line in content.lines() {
         let line = line.trim();
