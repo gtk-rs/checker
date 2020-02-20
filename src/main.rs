@@ -57,6 +57,7 @@ struct Info {
 
 // Return a map where the key is the full object name and has the manual associated traits.
 fn get_objects(toml_file: &Path) -> Info {
+    println!("==> Getting objects from {:?}", toml_file.display());
     let toml: Value = toml::from_str(&fs::read_to_string(toml_file).expect("failed to read toml"))
         .expect("invalid toml");
     let mut correctly_declared_manual_traits: HashSet<String> = HashSet::new();
@@ -123,6 +124,7 @@ fn get_objects(toml_file: &Path) -> Info {
             }
         }
     }
+    println!("<== done");
     Info {
         correctly_declared_manual_traits,
         listed_crate_objects,
@@ -160,6 +162,7 @@ fn get_manual_traits_from_file(src_file: &Path, objects: &Info, ret: &mut Vec<St
 }
 
 fn get_manual_traits(src_dir: &Path, objects: &Info) -> Vec<String> {
+    println!("==> Getting manual traits from {:?}", src_dir.display());
     let mut ret = Vec::new();
 
     for entry in fs::read_dir(src_dir).expect("read_dir failed") {
@@ -169,14 +172,15 @@ fn get_manual_traits(src_dir: &Path, objects: &Info) -> Vec<String> {
             get_manual_traits_from_file(&path, objects, &mut ret);
         }
     }
+    println!("<== done");
     ret
 }
 
-fn run_check<P: AsRef<Path>>(folder: P) -> bool {
+fn run_check<P: AsRef<Path>>(folder: P, gir_file: &str) -> bool {
     let folder = folder.as_ref();
     println!("=> Running for {}", folder.display());
 
-    let objects = get_objects(&folder.join("Gir.toml"));
+    let objects = get_objects(&folder.join(gir_file));
     let results = get_manual_traits(&folder.join("src"), &objects);
     if !results.is_empty() {
         println!("==> Some manual traits are missing from the Gir.toml file:");
@@ -189,11 +193,24 @@ fn run_check<P: AsRef<Path>>(folder: P) -> bool {
 }
 
 fn main() {
+    let mut gir_file = "Gir.toml".to_owned();
     let mut result = true;
-    for arg in env::args().into_iter().skip(1) {
-        if !run_check(&arg) {
-            result = false;
+    let args = env::args().into_iter().skip(1).collect::<Vec<_>>();
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--gir-file" {
+            i += 1;
+            if i >= args.len() {
+                break
+            }
+            gir_file = args[i].to_owned();
+        } else {
+            if !run_check(&arg, &gir_file) {
+                result = false;
+            }
         }
+        i += 1;
     }
     if !result {
         eprintln!("failed");
