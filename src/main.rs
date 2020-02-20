@@ -192,6 +192,12 @@ fn run_check<P: AsRef<Path>>(folder: P, gir_file: &str) -> bool {
     results.is_empty()
 }
 
+fn show_help() {
+    println!("== checker options ==");
+    println!("  --gir-file   : Set gir file path to be used for all following folders");
+    println!("  -h | --help  : Display this help");
+}
+
 fn main() {
     let mut gir_file = "Gir.toml".to_owned();
     let mut result = true;
@@ -205,6 +211,9 @@ fn main() {
                 break
             }
             gir_file = args[i].to_owned();
+        } else if arg == "--help" || arg == "-h" {
+            show_help();
+            return;
         } else {
             if !run_check(&arg, &gir_file) {
                 result = false;
