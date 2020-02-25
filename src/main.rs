@@ -210,7 +210,7 @@ fn run_check<P: AsRef<Path>>(folder: P, gir_file: &str) -> bool {
     let objects = get_objects(&folder.join(gir_file));
     let results = get_manual_traits(&folder.join("src"), &objects);
     if !results.is_empty() {
-        println!("==> Some manual traits are missing from the Gir.toml file:");
+        println!("xx> Some manual traits are missing from the Gir.toml file:");
         for result in results.iter() {
             println!("{}", result);
         }
