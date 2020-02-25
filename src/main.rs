@@ -132,7 +132,13 @@ fn get_objects(toml_file: &Path) -> Info {
 }
 
 fn get_manual_traits_from_file(src_file: &Path, objects: &Info, ret: &mut Vec<String>) {
-    let content = fs::read_to_string(src_file).expect("failed to read source file");
+    let content = match fs::read_to_string(src_file) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Unable to read {:?}: {}", src_file.display(), e);
+            return
+        }
+    };
     for line in content.lines() {
         let line = line.trim();
         if !line.starts_with("pub trait ") {
@@ -165,8 +171,20 @@ fn get_manual_traits(src_dir: &Path, objects: &Info) -> Vec<String> {
     println!("==> Getting manual traits from {:?}", src_dir.display());
     let mut ret = Vec::new();
 
-    for entry in fs::read_dir(src_dir).expect("read_dir failed") {
-        let entry = entry.expect("failed to read entry");
+    for entry in match fs::read_dir(src_dir) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("Failed to read folder {:?}: {}", src_dir.display(), e);
+            return Vec::new();
+        }
+    } {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("Failed to read an entry: {}", e);
+                continue
+            }
+        };
         let path = entry.path();
         if !path.is_dir() {
             get_manual_traits_from_file(&path, objects, &mut ret);
