@@ -58,10 +58,19 @@ struct Info {
 // Return a map where the key is the full object name and has the manual associated traits.
 fn get_objects(toml_file: &Path) -> Info {
     println!("==> Getting objects from {:?}", toml_file.display());
-    let toml: Value = toml::from_str(&fs::read_to_string(toml_file).expect("failed to read toml"))
-        .expect("invalid toml");
     let mut correctly_declared_manual_traits: HashSet<String> = HashSet::new();
     let mut listed_crate_objects: HashSet<String> = HashSet::new();
+
+    let toml: Value = toml::from_str(&match fs::read_to_string(toml_file) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("Error when reading {:?}: {}", toml_file.display(), e);
+            return Info {
+                correctly_declared_manual_traits,
+                listed_crate_objects,
+            }
+        }
+    }).expect("invalid toml");
 
     let current_lib = toml
         .lookup_str("options.library")
