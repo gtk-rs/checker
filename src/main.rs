@@ -50,6 +50,7 @@ impl TomlHelper for toml::Value {
     }
 }
 
+#[derive(Debug)]
 struct Info {
     correctly_declared_manual_traits: HashSet<String>,
     listed_crate_objects: HashSet<String>,
