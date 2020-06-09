@@ -5,4 +5,5 @@ matrix:
     - os: linux
       rust: stable
 script:
+  - cargo fmt -- --check
   - cargo check
