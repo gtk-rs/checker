@@ -68,9 +68,10 @@ fn get_objects(toml_file: &Path) -> Info {
             return Info {
                 correctly_declared_manual_traits,
                 listed_crate_objects,
-            }
+            };
         }
-    }).expect("invalid toml");
+    })
+    .expect("invalid toml");
 
     let current_lib = toml
         .lookup_str("options.library")
@@ -145,7 +146,7 @@ fn get_manual_traits_from_file(src_file: &Path, objects: &Info, ret: &mut Vec<St
         Ok(c) => c,
         Err(e) => {
             eprintln!("Unable to read {:?}: {}", src_file.display(), e);
-            return
+            return;
         }
     };
     for line in content.lines() {
@@ -191,7 +192,7 @@ fn get_manual_traits(src_dir: &Path, objects: &Info) -> Vec<String> {
             Ok(e) => e,
             Err(e) => {
                 eprintln!("Failed to read an entry: {}", e);
-                continue
+                continue;
             }
         };
         let path = entry.path();
@@ -235,7 +236,7 @@ fn main() {
         if arg == "--gir-file" {
             i += 1;
             if i >= args.len() {
-                break
+                break;
             }
             gir_file = args[i].to_owned();
         } else if arg == "--help" || arg == "-h" {
