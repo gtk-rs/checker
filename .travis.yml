@@ -1,9 +1,0 @@
-dist: xenial
-language: rust
-matrix:
-  include:
-    - os: linux
-      rust: stable
-script:
-  - cargo fmt -- --check
-  - cargo check
