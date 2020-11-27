@@ -8,6 +8,8 @@ use std::process::exit;
 
 use toml::Value;
 
+type Result<T, E = String> = std::result::Result<T, E>;
+
 macro_rules! get_vec {
     ($toml:expr, $key:expr) => {{
         match $toml.lookup_vec($key) {
@@ -57,21 +59,15 @@ struct Info {
 }
 
 // Return a map where the key is the full object name and has the manual associated traits.
-fn get_objects(toml_file: &Path) -> Info {
+fn get_objects(toml_file: &Path) -> Result<Info> {
     println!("==> Getting objects from {:?}", toml_file.display());
     let mut correctly_declared_manual_traits: HashSet<String> = HashSet::new();
     let mut listed_crate_objects: HashSet<String> = HashSet::new();
 
-    let toml: Value = toml::from_str(&match fs::read_to_string(toml_file) {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("Error when reading {:?}: {}", toml_file.display(), e);
-            return Info {
-                correctly_declared_manual_traits,
-                listed_crate_objects,
-            };
-        }
-    })
+    let toml: Value = toml::from_str(
+        &fs::read_to_string(toml_file)
+            .map_err(|e| format!("Failed to read {:?}: {}", toml_file, e))?,
+    )
     .expect("invalid toml");
 
     let current_lib = toml
@@ -136,20 +132,19 @@ fn get_objects(toml_file: &Path) -> Info {
         }
     }
     println!("<== done");
-    Info {
+    Ok(Info {
         correctly_declared_manual_traits,
         listed_crate_objects,
-    }
+    })
 }
 
-fn get_manual_traits_from_file(src_file: &Path, objects: &Info, ret: &mut Vec<String>) {
-    let content = match fs::read_to_string(src_file) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("Unable to read {:?}: {}", src_file.display(), e);
-            return;
-        }
-    };
+fn get_manual_traits_from_file(
+    src_file: &Path,
+    objects: &Info,
+    ret: &mut Vec<String>,
+) -> Result<()> {
+    let content = fs::read_to_string(src_file)
+        .map_err(|e| format!("Failed to read {:?}: {}", src_file, e))?;
     for line in content.lines() {
         let line = line.trim();
         if !line.starts_with("pub trait ") {
@@ -176,41 +171,33 @@ fn get_manual_traits_from_file(src_file: &Path, objects: &Info, ret: &mut Vec<St
             ret.push(name.to_owned());
         }
     }
+
+    Ok(())
 }
 
-fn get_manual_traits(src_dir: &Path, objects: &Info) -> Vec<String> {
+fn get_manual_traits(src_dir: &Path, objects: &Info) -> Result<Vec<String>> {
     println!("==> Getting manual traits from {:?}", src_dir.display());
     let mut ret = Vec::new();
 
-    for entry in match fs::read_dir(src_dir) {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("Failed to read folder {:?}: {}", src_dir.display(), e);
-            return Vec::new();
-        }
-    } {
-        let entry = match entry {
-            Ok(e) => e,
-            Err(e) => {
-                eprintln!("Failed to read an entry: {}", e);
-                continue;
-            }
-        };
+    for entry in fs::read_dir(src_dir)
+        .map_err(|e| format!("Failed to read directory {:?}: {}", src_dir, e))?
+    {
+        let entry = entry.expect("Failed to enter directory");
         let path = entry.path();
         if !path.is_dir() {
-            get_manual_traits_from_file(&path, objects, &mut ret);
+            get_manual_traits_from_file(&path, objects, &mut ret)?;
         }
     }
     println!("<== done");
-    ret
+    Ok(ret)
 }
 
-fn run_check<P: AsRef<Path>>(folder: P, gir_file: &str) -> bool {
+fn run_check<P: AsRef<Path>>(folder: P, gir_file: &str) -> Result<bool> {
     let folder = folder.as_ref();
     println!("=> Running for {}", folder.display());
 
-    let objects = get_objects(&folder.join(gir_file));
-    let results = get_manual_traits(&folder.join("src"), &objects);
+    let objects = get_objects(&folder.join(gir_file))?;
+    let results = get_manual_traits(&folder.join("src"), &objects)?;
     if !results.is_empty() {
         println!("xx> Some manual traits are missing from the Gir.toml file:");
         for result in results.iter() {
@@ -218,7 +205,7 @@ fn run_check<P: AsRef<Path>>(folder: P, gir_file: &str) -> bool {
         }
     }
     println!("<= done");
-    results.is_empty()
+    Ok(results.is_empty())
 }
 
 fn show_help() {
@@ -227,7 +214,7 @@ fn show_help() {
     println!("  -h | --help  : Display this help");
 }
 
-fn main() {
+fn main() -> Result<()> {
     let mut gir_file = "Gir.toml".to_owned();
     let mut result = true;
     let args = env::args().into_iter().skip(1).collect::<Vec<_>>();
@@ -242,9 +229,9 @@ fn main() {
             gir_file = args[i].to_owned();
         } else if arg == "--help" || arg == "-h" {
             show_help();
-            return;
+            return Ok(());
         } else {
-            if !run_check(&arg, &gir_file) {
+            if !run_check(&arg, &gir_file)? {
                 result = false;
             }
         }
@@ -255,4 +242,5 @@ fn main() {
         exit(1);
     }
     println!("success!");
+    Ok(())
 }
