@@ -13,12 +13,13 @@ macro_rules! get_vec {
     }};
 }
 
+mod license;
 mod manual_traits;
 mod types;
 
 fn run_check<P: AsRef<Path>>(folder: P, gir_file: &str) -> types::CheckResult<bool> {
     println!("=> Running for {}", folder.as_ref().display());
-    let result = manual_traits::run_check(folder, gir_file)?;
+    let result = manual_traits::run_check(&folder, gir_file)? && license::run_check(&folder)?;
     println!("<= done");
     Ok(result)
 }
@@ -27,6 +28,8 @@ fn show_help() {
     println!("== checker options ==");
     println!("  --gir-file   : Set gir file path to be used for all following folders");
     println!("  -h | --help  : Display this help");
+    println!("");
+    println!("Any other argument will be the folder to run `checker` into.");
 }
 
 fn main() -> types::CheckResult<()> {

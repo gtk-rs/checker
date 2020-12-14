@@ -179,7 +179,7 @@ fn get_manual_traits(src_dir: &Path, objects: &Info) -> CheckResult<Vec<String>>
     Ok(ret)
 }
 
-pub fn run_check<P: AsRef<Path>>(folder: P, gir_file: &str) -> CheckResult<bool> {
+pub fn run_check<P: AsRef<Path>>(folder: &P, gir_file: &str) -> CheckResult<bool> {
     let folder = folder.as_ref();
     let objects = get_objects(&folder.join(gir_file))?;
     let results = get_manual_traits(&folder.join("src"), &objects)?;
