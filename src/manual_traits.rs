@@ -66,9 +66,8 @@ fn get_objects(toml_file: &Path) -> CheckResult<Info> {
     {
         listed_crate_objects.insert(
             entry
-                .split(".")
-                .skip(1)
-                .next()
+                .split('.')
+                .nth(1)
                 .expect("couldn't extract name")
                 .to_owned(),
         );
@@ -79,9 +78,8 @@ fn get_objects(toml_file: &Path) -> CheckResult<Info> {
     {
         listed_crate_objects.insert(
             entry
-                .split(".")
-                .skip(1)
-                .next()
+                .split('.')
+                .nth(1)
                 .expect("couldn't extract name")
                 .to_owned(),
         );
@@ -90,17 +88,17 @@ fn get_objects(toml_file: &Path) -> CheckResult<Info> {
         .iter()
         .filter_map(|x| x.as_str())
     {
-        let mut parts = entry.split(".");
+        let mut parts = entry.split('.');
         let lib = parts.next().expect("failed to extract lib");
         if lib != current_lib {
             continue;
         }
         listed_crate_objects.insert(parts.next().expect("couldn't extract name").to_owned());
     }
-    for objs in toml.lookup("object").map(|a| a.as_array().unwrap()) {
+    if let Some(objs) = toml.lookup("object").map(|a| a.as_array().unwrap()) {
         for obj in objs {
             if let Some(name) = obj.lookup_str("name") {
-                let mut parts = name.split(".");
+                let mut parts = name.split('.');
                 let lib = parts.next().expect("failed to extract lib");
                 if lib != current_lib {
                     continue;
@@ -138,7 +136,7 @@ fn get_manual_traits_from_file(
             continue;
         }
         let line = &line[10..];
-        let mut pos = (line.find('{').unwrap_or(line.len()), '{');
+        let mut pos = (line.find('{').unwrap_or_else(|| line.len()), '{');
         for x in &['<', ':'] {
             if let Some(p) = line.find(*x) {
                 if p < pos.0 {

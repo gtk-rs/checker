@@ -41,7 +41,7 @@ fn show_help() {
     println!("  -h | --help        : Display this help");
     println!("  --no-manual-traits : Don't run manual_traits check");
     println!("  --no-license       : Don't run license check");
-    println!("");
+    println!();
     println!("Any other argument will be the folder to run `checker` into.");
 }
 
