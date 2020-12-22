@@ -13,7 +13,7 @@ fn check_if_valid_indent(path: &Path) -> CheckResult<bool> {
     let f = BufReader::new(f);
     for (nb_line, line) in f.lines().enumerate() {
         let line = line.unwrap();
-        if line.len() - line.trim_start().len() % 4 != 0 {
+        if (line.len() - line.trim_start().len()) % 4 != 0 {
             println!(
                 "xx> Invalid indent in `{}:{}`: it must be a multiple of 4!",
                 path.display(),
