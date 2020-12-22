@@ -13,6 +13,7 @@ macro_rules! get_vec {
     }};
 }
 
+mod gir_files;
 mod license;
 mod manual_traits;
 mod types;
@@ -31,6 +32,7 @@ fn run_check<P: AsRef<Path>>(
     if check_license {
         result &= license::run_check(&folder)?;
     }
+    result &= gir_files::run_check(&folder)?;
     println!("<= done");
     Ok(result)
 }
@@ -42,7 +44,7 @@ fn show_help() {
     println!("  --no-manual-traits : Don't run manual_traits check");
     println!("  --no-license       : Don't run license check");
     println!();
-    println!("Any other argument will be the folder to run `checker` into.");
+    println!("!!> Any other argument will be the folder to run `checker` into.");
 }
 
 fn main() -> types::CheckResult<()> {
