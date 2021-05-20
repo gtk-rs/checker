@@ -42,7 +42,7 @@ def need_doc_alias(content, pos, alias):
     pos -= 1
     while pos >= 0:
         stripped = content[pos].strip()
-        if not stripped.startswith("#[") and not stripped.startswith("///"):
+        if not stripped.startswith("#[") and not stripped.startswith("//"):
             return True
         elif stripped == alias:
             return False
@@ -133,7 +133,8 @@ def add_parts(path):
                 break
             if "ffi::" in content[x]:
                 sys_name = get_sys_name(content[x])
-                if is_valid_name(sys_name):
+                # FIXME: might be nice to maybe add a configuration file for such cases...
+                if is_valid_name(sys_name) and (sys_name != "gtk_is_initialized" or fn_name != "init"):
                     alias = '#[doc(alias = "{}")]'.format(sys_name)
                     if need_doc_alias(content, start, alias) and fn_name in sys_name:
                         content.insert(start, spaces + alias)
