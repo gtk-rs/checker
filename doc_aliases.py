@@ -42,7 +42,7 @@ def need_doc_alias(content, pos, alias):
     pos -= 1
     while pos >= 0:
         stripped = content[pos].strip()
-        if not stripped.startswith("#[") and not stripped.startswith("///"):
+        if not stripped.startswith("#[") and not stripped.startswith("//"):
             return True
         elif stripped == alias:
             return False
