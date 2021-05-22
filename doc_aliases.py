@@ -17,6 +17,11 @@ def is_valid_name(s):
     for x in IGNORE_C_FNS:
         if s.endswith(x):
             return False
+    for x in IGNORE_FNS_START:
+        if s.startswith(x):
+            return False
+    if s in IGNORE_FNS:
+        return False
     return True
 
 
@@ -28,13 +33,7 @@ def get_fn_name(s):
     x += 1
     if x >= len(parts):
         return None
-    fn_name = parts[x].split("<")[0].split("(")[0]
-    for x in IGNORE_FNS_START:
-        if fn_name.startswith(x):
-            return None
-    if fn_name in IGNORE_FNS:
-        return None
-    return fn_name
+    return parts[x].split("<")[0].split("(")[0]
 
 
 # This to prevent to add the same doc alias more than once on a same function.
@@ -100,13 +99,23 @@ def generate_start_spaces(line, clean):
     return spaces
 
 
-def add_variant_doc_alias(content, clean, enums, is_in_enum):
+def add_variant_doc_alias(content, clean, enums, is_in_enum, ffi_first):
     parts = clean.split(" => ")
-    ffi_variant = parts[0].split("::")[1].strip()
-    variant = parts[1].split("::")[1].split("(")[0].split(",")[0].strip()
+    a = parts[0].split("::")[1].strip()
+    b = parts[1].split("::")[1].split("(")[0].split(",")[0].strip()
+    if ffi_first:
+        if "ffi::" not in parts[0]:
+            return 0
+        ffi_variant = a
+        variant = b
+    else:
+        if "ffi::" not in parts[1]:
+            return 0
+        ffi_variant = b
+        variant = a
     variant_pos = find_variant_in_enum(content, enums.get(is_in_enum), variant)
     if variant_pos is None:
-        print("Cannot find `{}` in enum `{}`, putting doc aliases on implementation".format(variant, is_in_enum))
+        print("Cannot find `{}` in enum `{}`, ignoring it...".format(variant, is_in_enum))
         return 0
     alias = '#[doc(alias = "{}")]'.format(ffi_variant)
     if need_doc_alias(content, variant_pos, alias):
@@ -202,10 +211,14 @@ def add_parts(path):
                             added += 1
                             start += 1
                             x += 1
-                elif is_in_enum is not None and " => " in clean and clean.startswith("ffi::"):
+                elif is_in_enum is not None and " => " in clean:
                     # Enum part
                     need_pos_update = True
-                    tmp = add_variant_doc_alias(content, clean, enums, is_in_enum)
+                    tmp = 0
+                    if clean.startswith("ffi::"):
+                        tmp = add_variant_doc_alias(content, clean, enums, is_in_enum, True)
+                    elif clean.startswith("Self::") or clean.startswith(is_in_enum + "::"):
+                        tmp = add_variant_doc_alias(content, clean, enums, is_in_enum, False)
                     added += tmp
                     x += tmp
             x += 1
