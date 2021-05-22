@@ -149,8 +149,10 @@ def add_parts(path):
                 if traits[trait] > start:
                     traits[trait] += added
         x += 1
-    with open(path, 'w') as f:
-        f.write('\n'.join(content))
+    # No need to re-write the file if nothing was changed.
+    if doc_alias_added > 0:
+        with open(path, 'w') as f:
+            f.write('\n'.join(content))
     return doc_alias_added
 
 
