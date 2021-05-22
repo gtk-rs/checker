@@ -100,6 +100,22 @@ def generate_start_spaces(line, clean):
     return spaces
 
 
+def add_variant_doc_alias(content, clean, enums, is_in_enum):
+    parts = clean.split(" => ")
+    ffi_variant = parts[0].split("::")[1].strip()
+    variant = parts[1].split("::")[1].split("(")[0].split(",")[0].strip()
+    variant_pos = find_variant_in_enum(content, enums.get(is_in_enum), variant)
+    if variant_pos is None:
+        print("Cannot find `{}` in enum `{}`, putting doc aliases on implementation".format(variant, is_in_enum))
+        return 0
+    alias = '#[doc(alias = "{}")]'.format(ffi_variant)
+    if need_doc_alias(content, variant_pos, alias):
+        spaces = generate_start_spaces(content[variant_pos], content[variant_pos].strip())
+        content.insert(variant_pos, spaces + alias)
+        return 1
+    return 0
+
+
 def add_parts(path):
     print("=> Updating '{}'".format(path))
     with open(path, 'r') as f:
@@ -148,15 +164,13 @@ def add_parts(path):
                 continue
             x += 1
             continue
-
-        if clean.endswith(';'): # very likely a trait method declaration.
+        elif clean.endswith(';'): # very likely a trait method declaration.
             x += 1
             continue
 
         added = 0
         need_pos_update = False
 
-        # Function/method part
         fn_name = get_fn_name(clean)
         if fn_name is None:
             x += 1
@@ -179,6 +193,7 @@ def add_parts(path):
                 clean = content[x].strip()
                 sys_name = get_sys_name(content[x])
                 if is_valid_name(sys_name):
+                    # Function/method part
                     # FIXME: might be nice to maybe add a configuration file for such cases...
                     if (sys_name != "gtk_is_initialized" or fn_name != "init"):
                         alias = '#[doc(alias = "{}")]'.format(sys_name)
@@ -190,20 +205,9 @@ def add_parts(path):
                 elif is_in_enum is not None and " => " in clean and clean.startswith("ffi::"):
                     # Enum part
                     need_pos_update = True
-                    parts = clean.split(" => ")
-                    ffi_variant = parts[0].split("::")[1].strip()
-                    variant = parts[1].split("::")[1].split("(")[0].split(",")[0].strip()
-                    variant_pos = find_variant_in_enum(content, enums.get(is_in_enum), variant)
-                    if variant_pos is None:
-                        print("Cannot find `{}` in enum `{}`, putting doc aliases on implementation".format(variant, is_in_enum))
-                        x += 1
-                        continue
-                    alias = '#[doc(alias = "{}")]'.format(ffi_variant)
-                    if need_doc_alias(content, variant_pos, alias):
-                        spaces = generate_start_spaces(content[variant_pos], content[variant_pos].strip())
-                        content.insert(variant_pos, spaces + alias)
-                        added += 1
-                        x += 1
+                    tmp = add_variant_doc_alias(content, clean, enums, is_in_enum)
+                    added += tmp
+                    x += tmp
             x += 1
 
         if need_pos_update and added > 0:
