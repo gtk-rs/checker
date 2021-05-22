@@ -68,6 +68,24 @@ def find_method_in_trait(content, start_line, fn_name):
     return None
 
 
+def find_variant_in_enum(content, start_line, variant_name):
+    if start_line is None:
+        # In case the enum hasn't been "discovered" yet or isn't in the same file.
+        return None
+    start_line += 1
+    while start_line < len(content):
+        clean = content[start_line].strip()
+        if clean.endswith(",") and not clean.startswith("//") and not clean.startswith("#["):
+            name = clean[:-1].split("(")[0].strip()
+            if name == variant_name:
+                return start_line
+        elif content[start_line] == "}":
+            # We reached the end of the trait declaration and found nothing...
+            break
+        start_line += 1
+    return None
+
+
 def get_sys_name(line):
     tmp = line.split("ffi::")[1].split("(")[0]
     if tmp == "gtk_init_check":
@@ -75,27 +93,45 @@ def get_sys_name(line):
     return tmp
 
 
+def generate_start_spaces(line, clean):
+    spaces = ''
+    for _ in range(0, len(line) - len(clean)):
+        spaces += ' '
+    return spaces
+
+
 def add_parts(path):
-    doc_alias_added = 0
     print("=> Updating '{}'".format(path))
     with open(path, 'r') as f:
         content = f.read().split('\n')
-    x = 0
+
     # The key is the trait name, the value is its line number.
     traits = {}
+    # The key is the enum name, the value is its line number.
+    enums = {}
+
+    original_len = len(content)
+    x = 0
     is_in_trait = None
+    is_in_enum = None
+
     while x < len(content):
         clean = content[x].lstrip()
-        if not clean.startswith("pub fn") and not clean.startswith("fn"):
+        if not clean.startswith("pub fn") and not clean.startswith("fn") and " => " not in clean:
             if content[x] == "}":
                 is_in_trait = None
+                is_in_enum = None
             elif (clean.startswith("impl ") or clean.startswith("impl<")) and " for " in clean:
-                name = clean.split(" for ")[0].split(" ")[-1].strip()
-                if name.endswith("Ext") or name.endswith("ExtManual"):
-                    is_in_trait = name
+                parts = clean.split(" for ")
+                trait_name = parts[0].split(" ")[-1].strip()
+                ty_name = parts[1].split(" ")[0].split("<")[0].strip()
+                if trait_name.endswith("Ext") or trait_name.endswith("ExtManual"):
+                    is_in_trait = trait_name
+                elif ty_name in enums:
+                    is_in_enum = ty_name
             # This is needed because we want to put Ext traits doc aliases on the trait methods
             # directly and not on their implementation.
-            if clean.startswith("pub trait") or clean.startswith("trait"):
+            elif clean.startswith("pub trait") or clean.startswith("trait"):
                 name = clean.split("trait")[1].split("<")[0].split(":")[0].split("{")[0].strip()
                 if name.endswith("Ext") or name.endswith("ExtManual"):
                     traits[name] = x
@@ -103,57 +139,87 @@ def add_parts(path):
                     while x < len(content) and content[x] != "}":
                         x += 1
                     continue
+            elif clean.startswith("pub enum"):
+                name = clean[len("pub enum"):].split("<")[0].split("{")[0].strip()
+                enums[name] = x
+                # Completely skip the enum declaration.
+                while x < len(content) and content[x] != "}":
+                    x += 1
+                continue
             x += 1
             continue
 
         if clean.endswith(';'): # very likely a trait method declaration.
             x += 1
             continue
+
+        added = 0
+        need_pos_update = False
+
+        # Function/method part
         fn_name = get_fn_name(clean)
         if fn_name is None:
             x += 1
             continue
-        spaces = ''
-        for _ in range(0, len(content[x]) - len(clean)):
-            spaces += ' '
+        spaces = generate_start_spaces(content[x], clean)
         spaces_and_braces = spaces + '}'
         start = x
-        need_traits_update = False
         if is_in_trait is not None:
             trait_method_pos = find_method_in_trait(content, traits.get(is_in_trait), fn_name)
             if trait_method_pos is None:
                 print("Cannot find `{}` in trait `{}`, putting doc aliases on implementation".format(fn_name, is_in_trait))
             else:
                 start = trait_method_pos
-                need_traits_update = True
+                need_pos_update = True
         x += 1
-        added = 0
         while x < len(content):
             if content[x] == spaces_and_braces:
                 break
             if "ffi::" in content[x]:
+                clean = content[x].strip()
                 sys_name = get_sys_name(content[x])
-                # FIXME: might be nice to maybe add a configuration file for such cases...
-                if is_valid_name(sys_name) and (sys_name != "gtk_is_initialized" or fn_name != "init"):
-                    alias = '#[doc(alias = "{}")]'.format(sys_name)
-                    if need_doc_alias(content, start, alias) and fn_name in sys_name:
-                        content.insert(start, spaces + alias)
-                        doc_alias_added += 1
+                if is_valid_name(sys_name):
+                    # FIXME: might be nice to maybe add a configuration file for such cases...
+                    if (sys_name != "gtk_is_initialized" or fn_name != "init"):
+                        alias = '#[doc(alias = "{}")]'.format(sys_name)
+                        if need_doc_alias(content, start, alias) and fn_name in sys_name:
+                            content.insert(start, spaces + alias)
+                            added += 1
+                            start += 1
+                            x += 1
+                elif is_in_enum is not None and " => " in clean and clean.startswith("ffi::"):
+                    # Enum part
+                    need_pos_update = True
+                    parts = clean.split(" => ")
+                    ffi_variant = parts[0].split("::")[1].strip()
+                    variant = parts[1].split("::")[1].split("(")[0].split(",")[0].strip()
+                    variant_pos = find_variant_in_enum(content, enums.get(is_in_enum), variant)
+                    if variant_pos is None:
+                        print("Cannot find `{}` in enum `{}`, putting doc aliases on implementation".format(variant, is_in_enum))
+                        x += 1
+                        continue
+                    alias = '#[doc(alias = "{}")]'.format(ffi_variant)
+                    if need_doc_alias(content, variant_pos, alias):
+                        spaces = generate_start_spaces(content[variant_pos], content[variant_pos].strip())
+                        content.insert(variant_pos, spaces + alias)
                         added += 1
-                        start += 1
                         x += 1
             x += 1
-        if need_traits_update and added > 0:
+
+        if need_pos_update and added > 0:
             # move their start pos
             for trait in traits:
                 if traits[trait] > start:
                     traits[trait] += added
+            for enum in enums:
+                if enums[enum] > start:
+                    enums[enum] += added
         x += 1
     # No need to re-write the file if nothing was changed.
-    if doc_alias_added > 0:
+    if len(content) != original_len:
         with open(path, 'w') as f:
             f.write('\n'.join(content))
-    return doc_alias_added
+    return len(content) - original_len
 
 
 def run_dirs(path):
