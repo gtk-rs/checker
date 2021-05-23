@@ -216,8 +216,10 @@ def add_parts(path):
                     need_pos_update = True
                     tmp = 0
                     if clean.startswith("ffi::"):
+                        # This is for the "form": "ffi::whatever => Self::Whatever"
                         tmp = add_variant_doc_alias(content, clean, enums, is_in_enum, True)
                     elif clean.startswith("Self::") or clean.startswith(is_in_enum + "::"):
+                        # This is for the "form": "Self::Whatever => ffi::whatever"
                         tmp = add_variant_doc_alias(content, clean, enums, is_in_enum, False)
                     added += tmp
                     x += tmp
