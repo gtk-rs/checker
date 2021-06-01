@@ -185,7 +185,7 @@ def add_parts(path):
             elif clean.startswith("pub struct ") and clean.endswith(");") and "ffi::" in clean:
                 # This is newtype like "pub struct Quark(ffi::GQuark);". We want to extract the ffi
                 # type and add it as a doc alias.
-                name = clean.split("ffi::")[1].split(");")[0].split(">")[0]
+                name = clean.split("ffi::")[1].split(");")[0].split(">")[0].split(",")[0]
                 alias = '#[doc(alias = "{}")]'.format(name)
                 if need_doc_alias(content, x, alias):
                     spaces = generate_start_spaces(content[x], clean)
