@@ -125,6 +125,17 @@ def add_variant_doc_alias(content, clean, enums, is_in_enum, ffi_first):
     return 0
 
 
+def update_positions(traits, enums, start, added):
+    if added > 0:
+        # move their start pos
+        for trait in traits:
+            if traits[trait] > start:
+                traits[trait] += added
+        for enum in enums:
+            if enums[enum] > start:
+                enums[enum] += added
+
+
 def add_parts(path):
     print("=> Updating '{}'".format(path))
     with open(path, 'r') as f:
@@ -171,6 +182,15 @@ def add_parts(path):
                 while x < len(content) and content[x] != "}":
                     x += 1
                 continue
+            elif clean.startswith("pub struct ") and clean.endswith(");") and "ffi::" in clean:
+                # This is newtype like "pub struct Quark(ffi::GQuark);". We want to extract the ffi
+                # type and add it as a doc alias.
+                name = clean.split("ffi::")[1].split(");")[0].split(">")[0]
+                alias = '#[doc(alias = "{}")]'.format(name)
+                if need_doc_alias(content, x, alias):
+                    spaces = generate_start_spaces(content[x], clean)
+                    content.insert(x, spaces + alias)
+                    update_positions(traits, enums, x, 1)
             x += 1
             continue
         elif clean.endswith(';'): # very likely a trait method declaration.
@@ -225,15 +245,10 @@ def add_parts(path):
                     x += tmp
             x += 1
 
-        if need_pos_update and added > 0:
-            # move their start pos
-            for trait in traits:
-                if traits[trait] > start:
-                    traits[trait] += added
-            for enum in enums:
-                if enums[enum] > start:
-                    enums[enum] += added
+        if need_pos_update:
+            update_positions(traits, enums, start, added)
         x += 1
+
     # No need to re-write the file if nothing was changed.
     if len(content) != original_len:
         with open(path, 'w') as f:
