@@ -125,15 +125,18 @@ def add_variant_doc_alias(content, clean, enums, is_in_enum, ffi_first):
     return 0
 
 
-def update_positions(traits, enums, start, added):
+def update_positions(traits, enums, structs, start, added):
     if added > 0:
         # move their start pos
         for trait in traits:
-            if traits[trait] > start:
+            if traits[trait] >= start:
                 traits[trait] += added
         for enum in enums:
-            if enums[enum] > start:
+            if enums[enum] >= start:
                 enums[enum] += added
+        for struct in structs:
+            if structs[struct] >= start:
+                structs[struct] += added
 
 
 def add_parts(path):
@@ -145,6 +148,8 @@ def add_parts(path):
     traits = {}
     # The key is the enum name, the value is its line number.
     enums = {}
+    # The key is the enum name, the value is its line number.
+    structs = {}
 
     original_len = len(content)
     x = 0
@@ -159,12 +164,34 @@ def add_parts(path):
                 is_in_enum = None
             elif (clean.startswith("impl ") or clean.startswith("impl<")) and " for " in clean:
                 parts = clean.split(" for ")
-                trait_name = parts[0].split(" ")[-1].strip()
+                if clean.startswith("impl<"):
+                    # In here we need to get past the generics of the impl
+                    pos = len("impl<")
+                    count = 1
+                    while count > 0 and pos < len(clean):
+                        if clean[pos] == "<":
+                            count += 1
+                        elif clean[pos] == ">":
+                            count -= 1
+                        pos += 1
+                    clean = parts[0][pos:].strip()
+                else:
+                    clean = parts[0][len("impl "):]
+                trait_name = clean.split("<")[0].strip()
                 ty_name = parts[1].split(" ")[0].split("<")[0].strip()
                 if trait_name.endswith("Ext") or trait_name.endswith("ExtManual"):
                     is_in_trait = trait_name
                 elif ty_name in enums:
                     is_in_enum = ty_name
+                elif trait_name.startswith("FromGlib") and ty_name in structs:
+                    ffi_name = clean.split("ffi::")[1].split(">")[0].split(",")[0].strip()
+                    alias = '#[doc(alias = "{}")]'.format(ffi_name)
+                    start = structs[ty_name]
+                    if need_doc_alias(content, start, alias):
+                        spaces = generate_start_spaces(content[start], content[start].strip())
+                        content.insert(start, spaces + alias)
+                        update_positions(traits, enums, structs, start, 1)
+                        x += 1
             # This is needed because we want to put Ext traits doc aliases on the trait methods
             # directly and not on their implementation.
             elif clean.startswith("pub trait") or clean.startswith("trait"):
@@ -182,15 +209,19 @@ def add_parts(path):
                 while x < len(content) and content[x] != "}":
                     x += 1
                 continue
-            elif clean.startswith("pub struct ") and clean.endswith(");") and "ffi::" in clean:
-                # This is newtype like "pub struct Quark(ffi::GQuark);". We want to extract the ffi
-                # type and add it as a doc alias.
-                name = clean.split("ffi::")[1].split(");")[0].split(">")[0].split(",")[0]
-                alias = '#[doc(alias = "{}")]'.format(name)
-                if need_doc_alias(content, x, alias):
-                    spaces = generate_start_spaces(content[x], clean)
-                    content.insert(x, spaces + alias)
-                    update_positions(traits, enums, x, 1)
+            elif clean.startswith("pub struct "):
+                if clean.endswith(");") and "ffi::" in clean:
+                    # This is newtype like "pub struct Quark(ffi::GQuark);". We want to extract the ffi
+                    # type and add it as a doc alias.
+                    name = clean.split("ffi::")[1].split(");")[0].split(">")[0].split(",")[0].strip()
+                    alias = '#[doc(alias = "{}")]'.format(name)
+                    if need_doc_alias(content, x, alias):
+                        spaces = generate_start_spaces(content[x], clean)
+                        content.insert(x, spaces + alias)
+                        update_positions(traits, enums, structs, x, 1)
+                else:
+                    name = clean.split(' struct ')[1].split('<')[0].split(':')[0].split('{')[0].strip()
+                    structs[name] = x
             x += 1
             continue
         elif clean.endswith(';'): # very likely a trait method declaration.
@@ -246,7 +277,7 @@ def add_parts(path):
             x += 1
 
         if need_pos_update:
-            update_positions(traits, enums, start, added)
+            update_positions(traits, enums, structs, start, added)
         x += 1
 
     # No need to re-write the file if nothing was changed.
