@@ -155,6 +155,9 @@ def add_parts(path):
     x = 0
     is_in_trait = None
     is_in_enum = None
+    # In this case, it's mostly used for bitfields, so the value will be something like "    }" to
+    # know when we leave the struct declaration.
+    is_in_struct = None
 
     while x < len(content):
         clean = content[x].lstrip()
@@ -162,6 +165,8 @@ def add_parts(path):
             if content[x] == "}":
                 is_in_trait = None
                 is_in_enum = None
+            elif is_in_struct == content[x]:
+                is_in_struct = None
             elif (clean.startswith("impl ") or clean.startswith("impl<")) and " for " in clean:
                 parts = clean.split(" for ")
                 if clean.startswith("impl<"):
@@ -219,9 +224,22 @@ def add_parts(path):
                         spaces = generate_start_spaces(content[x], clean)
                         content.insert(x, spaces + alias)
                         update_positions(traits, enums, structs, x, 1)
+                        x += 1
                 else:
                     name = clean.split(' struct ')[1].split('<')[0].split(':')[0].split('{')[0].strip()
                     structs[name] = x
+                    is_in_struct = generate_start_spaces(content[x], clean) + '}'
+            elif is_in_struct is not None and clean.startswith("const "):
+                # Bitfield declaration handling!
+                ffi_name = clean.split(" = ")[1].split(";")[0]
+                if "ffi::" in ffi_name:
+                    ffi_name = ffi_name.split("ffi::")[-1].strip()
+                    alias = '#[doc(alias = "{}")]'.format(ffi_name)
+                    if need_doc_alias(content, x, alias):
+                        spaces = generate_start_spaces(content[x], clean)
+                        content.insert(x, spaces + alias)
+                        update_positions(traits, enums, structs, x, 1)
+                        x += 1
             x += 1
             continue
         elif clean.endswith(';'): # very likely a trait method declaration.
