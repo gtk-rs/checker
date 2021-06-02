@@ -188,15 +188,21 @@ def add_parts(path):
                     is_in_trait = trait_name
                 elif ty_name in enums:
                     is_in_enum = ty_name
-                elif trait_name.startswith("FromGlib") and ty_name in structs:
-                    ffi_name = clean.split("ffi::")[1].split(">")[0].split(",")[0].strip()
-                    alias = '#[doc(alias = "{}")]'.format(ffi_name)
-                    start = structs[ty_name]
-                    if need_doc_alias(content, start, alias):
-                        spaces = generate_start_spaces(content[start], content[start].strip())
-                        content.insert(start, spaces + alias)
-                        update_positions(traits, enums, structs, start, 1)
-                        x += 1
+                elif trait_name.startswith("FromGlib") and "ffi::" in clean:
+                    tmp = None
+                    for kind in [structs, enums]:
+                        if ty_name in kind:
+                            tmp = kind
+                            break
+                    if tmp is not None:
+                        ffi_name = clean.split("ffi::")[1].split(">")[0].split(",")[0].strip()
+                        alias = '#[doc(alias = "{}")]'.format(ffi_name)
+                        start = kind[ty_name]
+                        if need_doc_alias(content, start, alias):
+                            spaces = generate_start_spaces(content[start], content[start].strip())
+                            content.insert(start, spaces + alias)
+                            update_positions(traits, enums, structs, start, 1)
+                            x += 1
             # This is needed because we want to put Ext traits doc aliases on the trait methods
             # directly and not on their implementation.
             elif clean.startswith("pub trait") or clean.startswith("trait"):
@@ -231,7 +237,7 @@ def add_parts(path):
                     is_in_struct = generate_start_spaces(content[x], clean) + '}'
             elif is_in_struct is not None and clean.startswith("const "):
                 # Bitfield declaration handling!
-                ffi_name = clean.split(" = ")[1].split(";")[0]
+                ffi_name = clean.split(" = ")[-1].split(";")[0]
                 if "ffi::" in ffi_name:
                     ffi_name = ffi_name.split("ffi::")[-1].strip()
                     alias = '#[doc(alias = "{}")]'.format(ffi_name)
