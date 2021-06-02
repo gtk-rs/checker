@@ -188,6 +188,23 @@ def add_parts(path):
                     is_in_trait = trait_name
                 elif ty_name in enums:
                     is_in_enum = ty_name
+                # Trying to get the doc alias from the `impl From<PdfMetadata> for ffi::cairo_pdf_metadata_t`
+                if trait_name == "From" and ty_name.startswith("ffi::"):
+                    impl_for = parts[0].split("From<")[-1].split(">")[0].strip()
+                    tmp = None
+                    for kind in [structs, enums]:
+                        if impl_for in kind:
+                            tmp = kind
+                            break
+                    if tmp is not None:
+                        alias = '#[doc(alias = "{}")]'.format(ty_name[len("ffi::"):])
+                        start = kind[impl_for]
+                        if need_doc_alias(content, start, alias):
+                            spaces = generate_start_spaces(content[start], content[start].strip())
+                            content.insert(start, spaces + alias)
+                            update_positions(traits, enums, structs, start, 1)
+                            x += 1
+                # This is to try to get the FFI name from the `FromGlib<ffi::whatever>`.
                 elif trait_name.startswith("FromGlib") and "ffi::" in clean:
                     tmp = None
                     for kind in [structs, enums]:
