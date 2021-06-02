@@ -254,7 +254,7 @@ def add_parts(path):
                     is_in_struct = generate_start_spaces(content[x], clean) + '}'
             elif is_in_struct is not None and clean.startswith("const "):
                 # Bitfield declaration handling!
-                ffi_name = clean.split(" = ")[-1].split(";")[0]
+                ffi_name = clean.split(" = ")[-1].split(";")[0].split(" ")[0]
                 if "ffi::" in ffi_name:
                     ffi_name = ffi_name.split("ffi::")[-1].strip()
                     alias = '#[doc(alias = "{}")]'.format(ffi_name)
