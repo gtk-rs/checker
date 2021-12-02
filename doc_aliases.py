@@ -262,6 +262,21 @@ def handle_general_code(content, clean, current_info):
             ffi_name = ffi_name.split("ffi::")[-1].strip()
             alias = f'#[doc(alias = "{ffi_name}")]'
             add_doc_alias_if_needed(content, current_info["pos"], alias, current_info)
+    elif (clean.startswith("pub const ") and
+            not clean.startswith("pub const fn ") and
+            not clean.startswith("pub const unsafe fn ")):
+        name = clean.split("pub const ")[1].split(":")[0]
+        whole_const = ""
+        start = current_info["pos"]
+        while current_info["pos"] < len(content):
+            whole_const += content[current_info["pos"]].strip()
+            if content[current_info["pos"]].endswith(";"):
+                break
+            current_info["pos"] += 1
+        if "ffi::" in whole_const:
+            ffi_name = whole_const.split("ffi::")[1].split(")")[0].split(";")[0].split("}")[0]
+            alias = f'#[doc(alias = "{ffi_name}")]'
+            add_doc_alias_if_needed(content, start, alias, current_info)
     current_info["pos"] += 1
 
 
@@ -352,6 +367,8 @@ def add_parts(path):
         "errors": 0,
         "is_in_trait": None,
         "is_in_enum": None,
+        # In case we are in a "impl X {" block.
+        "is_in_simple_impl": None,
         # In this case, it's mostly used for bitfields, so the value will be something like "    }"
         # to know when we leave the struct declaration.
         "is_in_struct": None,
