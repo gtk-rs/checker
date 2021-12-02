@@ -275,8 +275,9 @@ def handle_general_code(content, clean, current_info):
             current_info["pos"] += 1
         if "ffi::" in whole_const:
             ffi_name = whole_const.split("ffi::")[1].split(")")[0].split(";")[0].split("}")[0]
-            alias = f'#[doc(alias = "{ffi_name}")]'
-            add_doc_alias_if_needed(content, start, alias, current_info)
+            if "{" not in ffi_name:
+                alias = f'#[doc(alias = "{ffi_name.split(" ")[0]}")]'
+                add_doc_alias_if_needed(content, start, alias, current_info)
     current_info["pos"] += 1
 
 
