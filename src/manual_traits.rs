@@ -136,7 +136,7 @@ fn get_manual_traits_from_file(
             continue;
         }
         let line = &line[10..];
-        let mut pos = (line.find('{').unwrap_or_else(|| line.len()), '{');
+        let mut pos = (line.find('{').unwrap_or(line.len()), '{');
         for x in &['<', ':'] {
             if let Some(p) = line.find(*x) {
                 if p < pos.0 {
