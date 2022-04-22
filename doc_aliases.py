@@ -169,6 +169,7 @@ def handle_general_code(content, clean, current_info):
     if content[current_info["pos"]] == "}":
         current_info["is_in_trait"] = None
         current_info["is_in_enum"] = None
+        current_info["is_in_struct"] = None
     elif current_info["is_in_struct"] == content[current_info["pos"]]:
         current_info["is_in_struct"] = None
     elif (clean.startswith("impl ") or clean.startswith("impl<")) and " for " in clean:
@@ -204,18 +205,6 @@ def handle_general_code(content, clean, current_info):
             if tmp is not None:
                 alias = f'#[doc(alias = "{ty_name[len("ffi::"):]}")]'
                 start = kind[impl_for]
-                add_doc_alias_if_needed(content, start, alias, current_info)
-        # This is to try to get the FFI name from the `FromGlib<ffi::whatever>`.
-        elif trait_name.startswith("FromGlib") and "ffi::" in clean:
-            tmp = None
-            for kind in [current_info["structs"], current_info["enums"]]:
-                if ty_name in kind:
-                    tmp = kind
-                    break
-            if tmp is not None:
-                ffi_name = clean.split("ffi::")[1].split(">")[0].split(",")[0].strip()
-                alias = f'#[doc(alias = "{ffi_name}")]'
-                start = kind[ty_name]
                 add_doc_alias_if_needed(content, start, alias, current_info)
     # This is needed because we want to put Ext traits doc aliases on the trait methods
     # directly and not on their implementation.
