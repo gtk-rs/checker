@@ -288,7 +288,7 @@ def look_for_change(content, clean, current_info):
             trait = current_info["is_in_trait"]
             print(
                 f"Cannot find `{fn_name}` in trait `{trait}`, putting doc aliases on \
-                  implementation")
+implementation")
         else:
             start = trait_method_pos
             need_pos_update = True
