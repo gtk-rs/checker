@@ -1,5 +1,10 @@
 #!/bin/sh
 
+FILES="$1/src/*.rs"
+if test -d $1/src/auto; then
+    FILES="$FILES $1/src/auto/*.rs"
+fi
+
 perl -0777 -ne '
 BEGIN { $e = 0 }
 while (/^(\N*)\V*fn\s+(\w+)\s*(<[^(]+>)?\s*(\([^{;]+)\{\N*\n^(\N*)$/gms) {
@@ -16,4 +21,4 @@ while (/^(\N*)\V*fn\s+(\w+)\s*(<[^(]+>)?\s*(\([^{;]+)\{\N*\n^(\N*)$/gms) {
 		$e = 1
 	}
 }
-END { exit $e }' $1/src/*.rs $1/src/auto/*.rs
+END { exit $e }' $FILES
