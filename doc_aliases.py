@@ -29,6 +29,10 @@ def is_valid_name(name):
     return True
 
 
+def has_non_std_ffi(line):
+    return "ffi::" in line and "std::ffi::" not in line
+
+
 def get_fn_name(line):
     parts = line.split(" ")
     pos = 0
@@ -109,12 +113,12 @@ def add_variant_doc_alias(content, clean, ffi_first, current_info):
     part_a = parts[0].split("::")[1].strip()
     part_b = parts[1].split("::")[1].split("(")[0].split(",")[0].strip()
     if ffi_first:
-        if "ffi::" not in parts[0]:
+        if not has_non_std_ffi(parts[0]):
             return 0
         ffi_variant = part_a
         variant = part_b
     else:
-        if "ffi::" not in parts[1]:
+        if not has_non_std_ffi(parts[1]):
             return 0
         ffi_variant = part_b
         variant = part_a
@@ -195,7 +199,7 @@ def handle_general_code(content, clean, current_info):
             current_info["is_in_enum"] = ty_name
         # Trying to get the doc alias from the
         # `impl From<PdfMetadata> for ffi::cairo_pdf_metadata_t`
-        if trait_name == "From" and ty_name.startswith("ffi::"):
+        if trait_name == "From" and ty_name.startswith("ffi::") and has_non_std_ffi(parts[1]):
             impl_for = parts[0].split("From<")[-1].split(">")[0].strip()
             tmp = None
             for kind in [current_info["structs"], current_info["enums"]]:
@@ -225,7 +229,7 @@ def handle_general_code(content, clean, current_info):
             current_info["pos"] += 1
         return
     elif clean.startswith("pub struct "):
-        if clean.endswith(");") and "ffi::" in clean:
+        if clean.endswith(");") and has_non_std_ffi(clean):
             # This is newtype like "pub struct Quark(ffi::GQuark);". We want to extract the
             # ffi type and add it as a doc alias.
             name = (clean.split("ffi::")[1]
@@ -247,7 +251,7 @@ def handle_general_code(content, clean, current_info):
     elif current_info["is_in_struct"] is not None and clean.startswith("const "):
         # Bitfield declaration handling!
         ffi_name = clean.split(" = ")[-1].split(";")[0].split(" ")[0]
-        if "ffi::" in ffi_name:
+        if has_non_std_ffi(ffi_name):
             ffi_name = ffi_name.split("ffi::")[-1].strip()
             alias = f'#[doc(alias = "{ffi_name}")]'
             add_doc_alias_if_needed(content, current_info["pos"], alias, current_info)
@@ -262,7 +266,7 @@ def handle_general_code(content, clean, current_info):
             if content[current_info["pos"]].endswith(";"):
                 break
             current_info["pos"] += 1
-        if "ffi::" in whole_const:
+        if has_non_std_ffi(whole_const):
             ffi_name = whole_const.split("ffi::")[1].split(")")[0].split(";")[0].split("}")[0]
             if "{" not in ffi_name:
                 alias = f'#[doc(alias = "{ffi_name.split(" ")[0]}")]'
@@ -297,7 +301,7 @@ implementation")
         if content[current_info["pos"]] == spaces_and_braces:
             current_info["ignore_next"] = False
             break
-        if "ffi::" in content[current_info["pos"]]:
+        if has_non_std_ffi(content[current_info["pos"]]):
             clean = content[current_info["pos"]].strip()
             sys_name = get_sys_name(content[current_info["pos"]])
             if is_valid_name(sys_name):
@@ -316,12 +320,12 @@ implementation")
                 # Enum part
                 need_pos_update = True
                 tmp = 0
-                if clean.startswith("ffi::"):
+                if clean.startswith("ffi::") and has_non_std_ffi(clean):
                     # This is for the "form": "ffi::whatever => Self::Whatever"
                     tmp = add_variant_doc_alias(
                         content, clean, True, current_info)
                 elif (clean.startswith("Self::") or
-                        clean.startswith(current_info["is_in_enum"] + "::")):
+                        clean.startswith(current_info["is_in_enum"] + "::")) and has_non_std_ffi(clean):
                     # This is for the "form": "Self::Whatever => ffi::whatever"
                     tmp = add_variant_doc_alias(
                         content, clean, False, current_info)
